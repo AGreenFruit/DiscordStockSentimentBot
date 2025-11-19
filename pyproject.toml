@@ -6,7 +6,9 @@ readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
     "aiohttp>=3.9.0",
+    "apscheduler>=3.10.0",
     "beautifulsoup4>=4.14.2",
+    "discord.py>=2.3.0",
     "lxml>=6.0.2",
     "psycopg2-binary>=2.9.0",
     "pydantic>=2.0.0",

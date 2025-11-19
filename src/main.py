@@ -1,62 +1,72 @@
 import asyncio
-import os
 import logging
+import os
+import discord
 from dotenv import load_dotenv
-from app.jobs import StockAnalysisJob
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from apscheduler.triggers.interval import IntervalTrigger
 
-# Load environment variables
+from app.bot.discord_bot import bot
+from app.jobs.stock_tracker_job import StockTrackerJob
+
 load_dotenv()
 
-# Configure logging to see what's happening
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
+logger = logging.getLogger(__name__)
+
+scheduler = AsyncIOScheduler()
 
 
-async def test_stock_analysis():
-    """
-    Test the StockAnalysisJob with a sample ticker.
-    """
-    # Get API keys from environment
-    newsapi_key = os.getenv("NEWSAPI_KEY")
-    if not newsapi_key:
-        print("Error: NEWSAPI_KEY not found in environment variables")
-        print("Please create a .env file with your NewsAPI key")
-        print("Get your free key at: https://newsapi.org/register")
-        return
+async def run_stock_tracker():
+    try:
+        job = StockTrackerJob(
+            newsapi_key=os.getenv("NEWSAPI_KEY"),
+            finnhub_key=os.getenv("FINNHUB_API_KEY"),
+            bot=bot
+        )
+        await job.execute()
+    except Exception as e:
+        logger.error(f"Stock tracker error: {e}", exc_info=True)
 
-    finnhub_key = os.getenv("FINNHUB_API_KEY")
-    if not finnhub_key:
-        print("Error: FINNHUB_API_KEY not found in environment variables")
-        print("Please add your Finnhub API key to .env file")
-        print("Get your free key at: https://finnhub.io/register")
-        return
 
-    ticker = "BABA"
-    company_name = "Alibaba"
-    job = StockAnalysisJob(
-        job_id=f"test_job_{ticker}",
-        ticker=ticker,
-        company_name=company_name,
-        newsapi_key=newsapi_key,
-        finnhub_key=finnhub_key
+@bot.event
+async def on_ready():
+    logger.info(f'{bot.user} connected')
+    
+    await bot.change_presence(
+        activity=discord.Game(name="!commands for help")
     )
-    result = await job.execute()
 
-    if result['status'] == 'COMPLETED':
-        job_result = result['result']
-        print(f"\n{'='*60}")
-        print(f"Stock Analysis Results for {job_result['ticker']}")
-        print(f"{'='*60}")
-        print(f"\nArticles Found: {job_result['articles_found']}")
-        print(f"Sentiment: {job_result['sentiment_label']} "
-              f"(score: {job_result['sentiment_score']})")
-        print(f"Summary: {job_result['summary'] or 'Not yet implemented'}")
+    if not scheduler.running:
+        scheduler.add_job(
+            run_stock_tracker,
+            trigger=IntervalTrigger(hours=1),
+            id='stock_tracker_job',
+            replace_existing=True
+        )
+        scheduler.start()
+        logger.info("Scheduler started (hourly)")
+        await run_stock_tracker()
 
-    else:
-        print(f"\nError: {result['error']}")
+
+async def main():
+    token = os.getenv("DISCORD_BOT_TOKEN")
+    if not token:
+        raise ValueError("DISCORD_BOT_TOKEN required")
+
+    try:
+        await bot.start(token)
+    finally:
+        if scheduler.running:
+            scheduler.shutdown()
+        await bot.close()
 
 
 if __name__ == "__main__":
-    asyncio.run(test_stock_analysis())
+    try:
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        logger.info("Stopped")

@@ -110,7 +110,7 @@ class StocksTable(Table):
     """Stocks table with custom methods"""
 
     def __init__(self, conn, cursor):
-        super().__init__(conn, cursor, "stocks")
+        super().__init__(conn, cursor, "stock_analysis.stocks")
 
     def upsert(self, model: BaseModel) -> bool:
         """
@@ -175,7 +175,7 @@ class UserStockSubscriptionsTable(Table):
     """User stock subscriptions table with custom methods"""
 
     def __init__(self, conn, cursor):
-        super().__init__(conn, cursor, "user_stock_subscriptions")
+        super().__init__(conn, cursor, "stock_analysis.user_stock_subscriptions")
 
     def subscribe(
         self,
@@ -186,19 +186,27 @@ class UserStockSubscriptionsTable(Table):
         """
         Subscribe a user to a stock.
         Returns True if subscription was created, False if already exists.
+        Uses hash of discord_id+ticker as PRIMARY KEY.
         """
         try:
+            import hashlib
+            
+            # Create 16-char hash from discord_id + ticker
+            hash_input = f"{discord_id}:{ticker}"
+            full_hash = hashlib.sha256(hash_input.encode()).hexdigest()
+            hash_value = full_hash[:16]  # Take first 16 characters
+
             query = f"""
                 INSERT INTO {self.table_name}
-                    (discord_id, ticker, company_name, subscribed_at)
+                    (hash, discord_id, ticker, company_name)
                 VALUES (%s, %s, %s, %s)
-                ON CONFLICT (discord_id, ticker) DO NOTHING
-                RETURNING id
+                ON CONFLICT (hash) DO NOTHING
+                RETURNING hash
             """
 
             self.cursor.execute(
                 query,
-                (discord_id, ticker, company_name, datetime.now())
+                (hash_value, discord_id, ticker, company_name)
             )
             result = self.cursor.fetchone()
             self.conn.commit()
@@ -219,13 +227,20 @@ class UserStockSubscriptionsTable(Table):
         Returns True if subscription was removed, False if didn't exist.
         """
         try:
+            import hashlib
+            
+            # Create 16-char hash from discord_id + ticker
+            hash_input = f"{discord_id}:{ticker}"
+            full_hash = hashlib.sha256(hash_input.encode()).hexdigest()
+            hash_value = full_hash[:16]  # Take first 16 characters
+
             query = f"""
                 DELETE FROM {self.table_name}
-                WHERE discord_id = %s AND ticker = %s
-                RETURNING id
+                WHERE hash = %s
+                RETURNING hash
             """
 
-            self.cursor.execute(query, (discord_id, ticker))
+            self.cursor.execute(query, (hash_value,))
             result = self.cursor.fetchone()
             self.conn.commit()
 
