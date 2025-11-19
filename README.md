@@ -83,15 +83,22 @@ uv run python src/main.py
 ## How It Works
 
 1. **Subscribe**: `!subscribe NVDA` → Bot validates ticker and subscribes you
-2. **Hourly Analysis**: Bot scrapes news, analyzes sentiment, generates summaries
+2. **Daily Analysis**: Bot runs at 8am & 8pm EST, scrapes news, analyzes sentiment
 3. **Notifications**: Receive DM with sentiment score and summary
 4. **Check Anytime**: `!stockinfo NVDA` to see latest analysis
 
 ## Configuration
 
-**Change frequency** (edit `src/main.py`):
+**Change schedule** (edit `src/main.py`):
 ```python
-trigger=IntervalTrigger(hours=1)  # Default: hourly
+# 8am & 8pm EST (default)
+trigger=CronTrigger(hour='8,20', minute='0', timezone='America/New_York')
+
+# Every hour
+trigger=CronTrigger(minute='0')
+
+# Weekdays at 9am EST
+trigger=CronTrigger(hour='9', minute='0', day_of_week='mon-fri', timezone='America/New_York')
 ```
 
 **Adjust sentiment thresholds** (edit `src/app/services/sentiment_analyzer.py`):

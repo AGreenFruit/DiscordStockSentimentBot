@@ -4,7 +4,7 @@ import os
 import discord
 from dotenv import load_dotenv
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
-from apscheduler.triggers.interval import IntervalTrigger
+from apscheduler.triggers.cron import CronTrigger
 
 from app.bot.discord_bot import bot
 from app.jobs.stock_tracker_job import StockTrackerJob
@@ -43,12 +43,12 @@ async def on_ready():
     if not scheduler.running:
         scheduler.add_job(
             run_stock_tracker,
-            trigger=IntervalTrigger(hours=1),
+            trigger=CronTrigger(hour='8,20', minute='0', timezone='America/New_York'),
             id='stock_tracker_job',
             replace_existing=True
         )
         scheduler.start()
-        logger.info("Scheduler started (hourly)")
+        logger.info("Scheduler started (8am & 8pm EST daily)")
         await run_stock_tracker()
 
 
